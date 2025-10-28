@@ -4,6 +4,8 @@ import org.felipe.pokemon_api1.model.Pokemon;
 import org.felipe.pokemon_api1.modeldto.PokeApiDetailResponse;
 import org.felipe.pokemon_api1.modeldto.PokemonFavoriteRequest;
 import org.felipe.pokemon_api1.repository.PokemonRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -29,6 +31,8 @@ public class PokemonService {
         this.restTemplate = restTemplate;
     }
 
+    // Com CacheEvict, pois este método MODIFICA/CRIA dados
+    @CacheEvict(value = {"pokemonList", "pokemonDetails", "pokemonSearchByType"}, allEntries = true)
     public Pokemon cachePokemon(String nameOrId) {
         PokeApiDetailResponse apiResponse;
         try {
@@ -66,19 +70,27 @@ public class PokemonService {
         return repository.save(pokemon);
     }
 
+
+    @Cacheable("pokemonList")
     public Page<Pokemon> listAll(Pageable pageable) {
         return repository.findAll(pageable);
     }
 
+
+    @Cacheable(value = "pokemonDetails", key = "#idLocal")
     public Pokemon getDetails(Long idLocal) {
         return repository.findById(idLocal)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pokémon com idLocal " + idLocal + " não encontrado."));
     }
 
+
+    @Cacheable("pokemonSearchByType")
     public Page<Pokemon> searchByType(String typeName, Pageable pageable) {
         return repository.findByTypesContainingIgnoreCase(typeName, pageable);
     }
 
+
+    @CacheEvict(value = {"pokemonDetails", "pokemonList"}, key = "#idLocal")
     public Pokemon updateFavorite(Long idLocal, PokemonFavoriteRequest request) {
         Pokemon pokemon = getDetails(idLocal);
 

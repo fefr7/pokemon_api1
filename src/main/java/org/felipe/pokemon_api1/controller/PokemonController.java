@@ -3,6 +3,7 @@ package org.felipe.pokemon_api1.controller;
 import org.felipe.pokemon_api1.model.Pokemon;
 import org.felipe.pokemon_api1.modeldto.PokemonFavoriteRequest;
 import org.felipe.pokemon_api1.service.PokemonService;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -41,7 +42,7 @@ public class PokemonController {
 
     @PatchMapping("/{idLocal}/favorite")
     public ResponseEntity<Pokemon> updateFavorite(@PathVariable Long idLocal,
-                                                  @RequestBody PokemonFavoriteRequest request) {
+                                                 @Valid @RequestBody PokemonFavoriteRequest request) {
         return ResponseEntity.ok(service.updateFavorite(idLocal, request));
     }
 }
