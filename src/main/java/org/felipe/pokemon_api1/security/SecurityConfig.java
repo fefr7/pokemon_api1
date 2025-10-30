@@ -1,25 +1,37 @@
-
 package org.felipe.pokemon_api1.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
-
-import static org.springframework.security.config.Customizer.withDefaults;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.felipe.pokemon_api1.repository.UserRepository;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    private final UserRepository userRepository;
+
+    public SecurityConfig(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
+    @Bean
+    public UserDetailsService userDetailsService() {
+        return username -> userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado: " + username));
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -27,48 +39,30 @@ public class SecurityConfig {
     }
 
     @Bean
-    public UserDetailsService userDetailsService(PasswordEncoder encoder) {
-
-        UserDetails userPublic = User.builder()
-                .username("user")
-                .password(encoder.encode("password"))
-                .roles("USER")
-                .build();
-
-        UserDetails userAdmin = User.builder()
-                .username("admin")
-                .password(encoder.encode("adminpass"))
-                .roles("ADMIN", "USER")
-                .build();
-
-        return new InMemoryUserDetailsManager(userPublic, userAdmin);
+    public DaoAuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
+        authProvider.setUserDetailsService(userDetailsService());
+        authProvider.setPasswordEncoder(passwordEncoder());
+        return authProvider;
     }
 
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(HttpMethod.GET, "/api/pokemon/**").hasAnyRole("USER", "ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/pokemon").hasAnyRole("USER", "ADMIN")
-
-                        .requestMatchers(HttpMethod.POST, "/api/pokemon/cache/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PATCH, "/api/pokemon/*/favorite").hasRole("ADMIN")
-                        .requestMatchers("/h2-console/**").permitAll()
-                        .requestMatchers("/actuator/health").permitAll()
-
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .httpBasic(withDefaults());
-
-        http.headers(headers -> headers
-                .frameOptions(frameOptions -> frameOptions.sameOrigin())
-        );
+                .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authenticationProvider(authenticationProvider())
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 }
-
-
