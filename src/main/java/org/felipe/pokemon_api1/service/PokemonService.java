@@ -31,7 +31,6 @@ public class PokemonService {
         this.restTemplate = restTemplate;
     }
 
-    // Com CacheEvict, pois este método MODIFICA/CRIA dados
     @CacheEvict(value = {"pokemonList", "pokemonDetails", "pokemonSearchByType"}, allEntries = true)
     public Pokemon cachePokemon(String nameOrId) {
         PokeApiDetailResponse apiResponse;
